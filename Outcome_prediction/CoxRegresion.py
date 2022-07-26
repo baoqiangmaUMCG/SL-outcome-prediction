@@ -27,9 +27,7 @@ from lifelines.utils import concordance_index
 def main():
     opt = parse_opts()
     losses_str = '_'.join(opt.losses)
-    
-    ValidDataInd = pickle.load(open('/data/pg-dl_radioth/scripts/MultilabelLearning_OPC_Radiomics/OPC-Radiomics/ValidDataInd_clinical.d', 'rb'))
-    
+    ValidDataInd = pickle.load(open('../Data_preprocessing/VolPatch_clinical/ValidDataInd_clinical.d', 'rb'))
     opt.HNSCC_ptnum = 606
     ptlist = range(opt.HNSCC_ptnum)
     train_val_list, test_list, all_list = Train_test_split(ptlist,ValidDataInd)
@@ -39,26 +37,17 @@ def main():
     train_list = test_list[0:200]
     val_list  = test_list[200:]
     test_list = test_list[200:]
-    '''
-    train_list = train_val_list
-    val_list  = test_list
-    test_list = test_list
-    '''
+
     opt.result_path_ct = opt.result_path_linux + '_test_good_normalization_model' + str(opt.model) + '_inputtype' + str(opt.input_type)+ '_inputmodality0'+'_fold' + str(opt.fold) \
                           + '_lr' + str(opt.learning_rate) + '_optim_' + str(opt.optimizer)+ '_bs' + str(opt.batch_size) \
-                          + '_z_size' + str(opt.z_size) + '_md' + str(opt.model_depth) + '_sepconv_' + losses_str + '_' + opt.lr_scheduler+'_200train'
+                          + '_z_size' + str(opt.z_size) + '_md' + str(opt.model_depth) + '_sepconv_' + losses_str + '_' + opt.lr_scheduler
                           
     opcdata_ct = pd.read_csv(opt.result_path_ct+'/latent_feature.csv',header=0,index_col ='index')
 
-    opcdata = pd.read_csv('/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/opcradiomics_digits_202103_specific.csv',header=0,index_col ='Unnamed: 0')
+    opcdata = pd.read_csv('../Data_preprocessing/opcradiomics_digits_202103.csv',header=0,index_col ='Unnamed: 0')
 
-    #-------------
-    #   bootstrapping for feature selection
-    
-    # grouping different levels of the categorical variables
    
-
-    clinical_para_strat = [ 'WHO_SCORE_codes_0VS123','AGE','GESLACHT_codes','Smoking_codes','TSTAD_DEF_codes_T123VS4', 'NSTAD_DEF_codes_N01VSN2VSN3', 'P16_codes']
+    clinical_para_strat = [ 'WHO_SCORE_codes_0VS123','AGE','GESLACHT_codes','Smoking_codes','TSTAD_codes_T123VS4', 'NSTAD_codes_N01VSN2VSN3', 'P16_codes']
     event_columns_code = ['OS_code','TumorSpecificSurvival_code','MET_code','LR_code','RR_code','LRR_code','DFS_code'] # DFS here is not correct
     survival_columns = ['TIME_OS','TIME_TumorSpecificSurvival','TIME_MET','TIME_LR','TIME_RR','TIME_LRR','TIME_DFS']
     real_event_names = ['Overall survival','Tumor-specific survival','Distant metastasis-free survival','Local control','Regional control','Locoregional control',
@@ -90,7 +79,8 @@ def main():
     
     event_columns_code = event_columns_code
     survival_columns = survival_columns
-
+    
+    # input the selected clinical features in para_tokeep for buliding clinical model
     if opt.outcome ==0:
              para_tokeep = ['AGE',
 'P16_codes_combine',
@@ -135,16 +125,13 @@ def main():
     cphAll.print_summary()    ## HAve a look at the significance of the features
     cphAll.plot()
     
-    #predicted_survival_time  = cphAll.predict_survival_function(trainD[para_tokeep])
-    #print ('predicted_survival_time:', predicted_survival_time)
     
     print(cphAll.score(traindata[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
     print(cphAll.score(valdata[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
     #print(cphAll.score(testdata[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
     print (cphAll.log_likelihood_ratio_test())
     
-    opcdata['clinical_model_risk_'+event_columns_code[opt.outcome]] = cphAll.predict_log_partial_hazard(opcdata[para_tokeep])
-    
+    opcdata['clinical_model_risk_'+event_columns_code[opt.outcome]] = cphAll.predict_log_partial_hazard(opcdata[para_tokeep]) # save clinical model output 
     opcdata.to_csv(opt.result_path_ct+'/latent_feature_total'+event_columns_code[opt.outcome]+'.csv')
     
     # high and low risk groups, KM-curves
@@ -155,7 +142,7 @@ def main():
     # save the 1000 cindex values
     cindex_values = pd.DataFrame(cindex_values)
     cindex_values.loc[0, '95%_CI'] = str(ci_cindex)
-    cindex_values.to_csv("/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/cindex/" + "cindexs_"+ event_columns_code[opt.outcome]  + '_clinical_train.csv')
+    cindex_values.to_csv("./results/" + "cindexs_"+ event_columns_code[opt.outcome]  + '_clinical_train.csv')
     
     
     risk_scores_testing = cphAll.predict_log_partial_hazard(valdata[para_tokeep])
@@ -165,7 +152,7 @@ def main():
     # save the 1000 cindex values
     cindex_values = pd.DataFrame(cindex_values)
     cindex_values.loc[0, '95%_CI'] = str(ci_cindex)
-    cindex_values.to_csv("/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/cindex/" + "cindexs_"+ event_columns_code[opt.outcome]  + '_clinical_opcradiomics.csv')
+    cindex_values.to_csv("./results/" + "cindexs_"+ event_columns_code[opt.outcome]  + '_clinical_opcradiomics.csv')
     median_risk = np.median(cphAll.predict_log_partial_hazard(trainD[para_tokeep]))
     
     highrisk_group_list = risk_scores_testing[np.where(risk_scores_testing>median_risk)[0]].index
@@ -182,24 +169,7 @@ def main():
     results.print_summary()
     print('p-value:', results.p_value)        # 0.7676
     print(results.test_statistic) # 0.0872
-    '''
-    plt.figure()
-    ax = plt.subplot(111)
-    kmf_0 = KaplanMeierFitter()
-    ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    kmf_1 = KaplanMeierFitter()
-    ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    add_at_risk_counts(kmf_0, kmf_1, ax=ax)
-    plt.tight_layout()
-    plt.ylim([0.0,1.0])
-    ax.set_ylabel(real_event_names[opt.outcome])
-    ax.set_xlabel('Time (months)')
-    if results.p_value < 0.001:
-       plt.text(130, 0.05, 'p = '+str(results.p_value), fontsize=8)
-       #plt.text(70, 0.05, 'p < 0.001', fontsize=8)
-    else:
-       plt.text(130, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=8)
-    '''
+
        
     plt.figure()
     ax = plt.subplot(111)
@@ -225,7 +195,7 @@ def main():
     else:
        plt.text(105, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=14 )
 
-    figname = "/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/KM_high_low_risk/" + "KM5_clinical_"+ event + '_opcradiomics.svg'
+    figname = "./results/" + "KM5_clinical_"+ event + '_opcradiomics.svg'
     plt.savefig(figname, bbox_inches = 'tight')
     
     # combine model
@@ -284,7 +254,7 @@ def main():
     # save the 1000 cindex values
     cindex_values = pd.DataFrame(cindex_values)
     cindex_values.loc[0, '95%_CI'] = str(ci_cindex)
-    cindex_values.to_csv("/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/cindex/" + "cindexs_"+ event  + '_combine_train.csv')
+    cindex_values.to_csv("./results/" + "cindexs_"+ event  + '_combine_train.csv')
     
    
     risk_scores_testing = cphAll_combine.predict_log_partial_hazard(valdata[para_tokeep_combine])
@@ -294,7 +264,7 @@ def main():
     # save the 1000 cindex values
     cindex_values = pd.DataFrame(cindex_values)
     cindex_values.loc[0, '95%_CI'] = str(ci_cindex)
-    cindex_values.to_csv("/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/cindex/" + "cindexs_"+ event  + '_combine_opcradiomics.csv')
+    cindex_values.to_csv("./results/" + "cindexs_"+ event  + '_combine_opcradiomics.csv')
     
     #print (' risk of testing set:',risk_scores_testing)
     median_risk = np.median(cphAll_combine.predict_log_partial_hazard(trainD[para_tokeep_combine]))
@@ -316,25 +286,7 @@ def main():
     results.print_summary()
     print('p-value:', results.p_value)        # 0.7676
     print(results.test_statistic) # 0.0872
-    '''
-    plt.figure()
-    ax = plt.subplot(111)
-    kmf_0 = KaplanMeierFitter()
-    ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    kmf_1 = KaplanMeierFitter()
-    ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    add_at_risk_counts(kmf_0, kmf_1, ax=ax)
-    plt.tight_layout()
-    plt.ylim([0.0,1.0])
-    ax.set_ylabel(real_event_names[opt.outcome])
-    ax.set_xlabel('Time (months)')
-    plt.title('Internal testing set')
-    if results.p_value < 0.001:
-       plt.text(130, 0.05, 'p = '+str(results.p_value), fontsize=8)
-       #plt.text(70, 0.05, 'p < 0.001', fontsize=8)
-    else:
-       plt.text(130, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=8)
-    '''
+
     plt.figure()
     ax = plt.subplot(111)
     kmf_0 = KaplanMeierFitter()
@@ -358,296 +310,93 @@ def main():
        plt.text(105, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=14 )
     
     
-    figname = "/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/KM_high_low_risk/" + "KM5_combine_"+ event + '_opcradiomics.svg'
+    figname = "./results/" + "KM5_combine_"+ event + '_opcradiomics.svg'
     plt.savefig(figname, bbox_inches = 'tight')
-
-
-    ### external test 
-    ValidDataInd = pickle.load(open('/data/p303924/UMCGOPC/VolPatch_Clinical/ValidDataInd_clinical.d','rb'))
     
-    opcdata_ct = pd.read_csv(opt.result_path_ct+'/latent_feature_external.csv',header=0,index_col ='index')
-    #print ("external ct features:" , opcdata_ct)
     
-    clic_data = pd.read_csv("/data/pg-dl_radioth/scripts/MultilabelLearning_umcgopc/OPCdigits_2018split_202101_specific.csv")	
-    
-
-    patinets_401 = pd.read_excel("/data/pg-dl_radioth/scripts/MultilabelLearning_umcgopc/struct_paths_+CT_PET_E_401.xlsx")    
-    patinets_name = list(patinets_401['UMCG-ID'])    
-    clic_data['UMCG'] = [str(int(i)).zfill(7) for i in clic_data['UMCG']]
-    indexs = []
-    #print (patinets_name, clic_data['UMCG'] )
-    for patinet_name in patinets_name:
-
-        index = np.where(clic_data['UMCG'] == str(patinet_name).zfill(7))[0]        
-        indexs.append(index[0])       
-    opcdata = clic_data.loc[np.asarray(indexs)].reset_index(drop = True)
-
-       
-    opcdata = opcdata.ix[list(set(range(401))-set([0,16,42,55,60 ]))]
-    
-    # statistics of outcomes umcgopc
-    mean_follow_up = opcdata[survival_columns[opt.outcome]].mean()
-    print ('mean_follow_up_umcgopc:', mean_follow_up)
-    events_num = opcdata[event_columns_code[opt.outcome]].sum()
-    print ('events_num_umcgopc:', events_num)
-    print ('events_percent_umcgopc:', events_num/ 396)
-    
-    opcdata[ct_feature_list] = opcdata_ct[[str(i) for i in range(0,1024)]]
-    
-    valdata = opcdata[171:] # 2014-2020
-    # only select subgrop of external tesing sets (such as only positive patients)
-    valdata = valdata.loc[valdata['P16_codes'] != 0] # exclude hpv unknown patients
-    
-    valdata = valdata.reset_index(drop=True) 
-
-    opcdata.to_csv(opt.result_path_ct+'/latent_feature_total_external.csv')
-    print('external test clinical model c-index:', cphAll.score(valdata[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-   
-    valdata['clinical_model_risk_'+event_columns_code[opt.outcome]] = cphAll.predict_log_partial_hazard(valdata[para_tokeep])
-    
-    # high and low risk groups, KM-curves
-    trainD = traindata[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]]
-    risk_scores_testing = cphAll.predict_log_partial_hazard(valdata[para_tokeep])
-    # calculate 95%Ci of C-index 
-    ci_cindex,cindex_values = conf_cindex(-risk_scores_testing , valdata[survival_columns[opt.outcome]], valdata[event_columns_code[opt.outcome]])
-    print ("clinical model ci_cindex internal:",ci_cindex)
-    # save the 1000 cindex values
-    cindex_values = pd.DataFrame(cindex_values)
-    cindex_values.loc[0, '95%_CI'] = str(ci_cindex)
-    cindex_values.to_csv("/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/cindex/" + "cindexs_"+ event  + '_clinical_external(umcgopc).csv')
-  
-  
-    median_risk = np.median(cphAll.predict_log_partial_hazard(trainD[para_tokeep]))
-    
-    print ('median_risk:',median_risk)
-    highrisk_group_list = risk_scores_testing[np.where(risk_scores_testing>median_risk)[0]].index
-    lowrisk_group_list = risk_scores_testing[np.where(risk_scores_testing<=median_risk)[0]].index
-    print (highrisk_group_list, lowrisk_group_list)
+    # new calibration curves for all patients
     event = event_columns_code[opt.outcome]
     time_e = survival_columns[opt.outcome]
+    event_name  = ['OS','TSS','DMFS','LC','RC','LRC','DFS'][opt.outcome]
     
-    #log rank test
-    from lifelines.statistics import logrank_test
-    results = logrank_test(valdata.loc[highrisk_group_list][time_e], valdata.loc[lowrisk_group_list][time_e]
-                           , event_observed_A=valdata.loc[highrisk_group_list][event], event_observed_B=valdata.loc[lowrisk_group_list][event])
-    
-    results.print_summary()
-    print('p-value:', results.p_value)        # 0.7676
-    print(results.test_statistic) # 0.0872
-    '''
-    plt.figure()
-    ax = plt.subplot(111)
-    try:
-      kmf_0 = KaplanMeierFitter()
-      ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-      kmf_1 = KaplanMeierFitter()
-      ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-      add_at_risk_counts(kmf_0, kmf_1, ax=ax)
-      plt.tight_layout()
-      plt.ylim([0.0,1.0])
-      ax.set_ylabel(real_event_names[opt.outcome])
-      ax.set_xlabel('Time (months)')
-  
-      if results.p_value < 0.001:
-         plt.text(70, 0.05, 'p = '+str(results.p_value), fontsize=8)
-         #plt.text(70, 0.05, 'p < 0.001', fontsize=8)
-      else:
-         plt.text(70, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=8)
-    except: 
-      kmf_0 = KaplanMeierFitter()
-      ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-
-      add_at_risk_counts(kmf_0, ax=ax)
-      plt.tight_layout()
-      plt.ylim([0.0,1.0])
-      ax.set_ylabel(real_event_names[opt.outcome])
-      ax.set_xlabel('Time (months)')
-    '''
     plt.figure()
     ax = plt.subplot(111)
     kmf_0 = KaplanMeierFitter()
-    ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    kmf_1 = KaplanMeierFitter()
-    ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    add_at_risk_counts(kmf_0, kmf_1, ax=ax, fontsize = 14)
+    
+    # just draw calibratin cureves before 60 months
+    valdata.loc[valdata[time_e] > 60 ,event] = 0
+    valdata.loc[valdata[time_e] > 60 ,time_e] = 60
+    
+    ax = kmf_0.fit(valdata[time_e], valdata[event],label='Kaplan-Meier').plot_survival_function(ax=ax,show_censors=True,ci_show=True,color='blue')
     plt.tight_layout()
     plt.ylim([0.0,1.0])
-    ax.set_ylabel(str(real_event_names_short[opt.outcome]) + ' rate', fontsize = 16, fontweight = 'bold') # new
-    ax.set_xlabel('Time (months)',fontsize = 16, fontweight = 'bold')
-    ax.legend( loc='lower left', prop={ 'size': 14})
-    # new
-    #ax.set_xticks(labelsize = 14)
-    #ax.set_yticks(labelsize = 14)
+   
+    ax.set_ylabel(event_name + ' rate', fontsize = 16, fontweight = 'bold')
+    ax.set_xlabel('Time (months)', fontsize = 16, fontweight = 'bold')   
     ax.tick_params(axis='both',labelsize = 14)
-    plt.title("External test" , fontsize = 16, fontweight = 'bold') # new
-    if results.p_value < 0.001:
-       plt.text(55, 0.05, 'p = '+str(format(results.p_value,'.5e'))[:5] +str(format(results.p_value,'.5e'))[-4:], fontsize=14)
-    else:
-       plt.text(55, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=14 )
+    plt.title("Independent internal test" , fontsize = 16, fontweight = 'bold')
+    predicted_survival_function = cphAll_combine.predict_survival_function(valdata[para_tokeep_combine],times= np.asarray(sorted(list(set(valdata[time_e])))))
+    #print ('predicted_survival_function',predicted_survival_function)
+    ax = predicted_survival_function.mean(1).plot(color='red' , label = 'Predicted')
+    # draw ci of predicted
+    ci = 1.96 * np.std(np.array(predicted_survival_function), axis=1)/np.sqrt(np.array(predicted_survival_function).shape[1])
+    x = np.array(predicted_survival_function.mean(1).index)
+    y = np.array(predicted_survival_function.mean(1))
+    ax.fill_between(x, (y -ci), (y + ci), color='red', alpha=.3)
     
-    figname = "/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/KM_high_low_risk/" + "KM5_clinical_"+ event + '_umcgopc_(external).svg'
+    add_at_risk_counts(kmf_0, ax=ax, fontsize = 14)
+    ax.legend(loc='lower left' , prop={ 'size': 14})
+    plt.savefig("./results/" + "Calibration_"+ event + '_opcradiomics.svg', bbox_inches = 'tight')
+    
+    # draw calibration curve at 2-year
+    event_columns_code_2year = ['OS_2year','TumorSpecificSurvival_2year','MET_code_2year','LR_code_2year','RR_code_2year','LRR_code_2year','DFS_code_2year']
+    event_columns_code_2year_uncensoring = ['OS_2year_uncensoring','TumorSpecificSurvival_2year_uncensoring','MET_code_2year_uncensoring',
+                                        'LR_code_2year_uncensoring','RR_code_2year_uncensoring','LRR_code_2year_uncensoring',
+                                        'DFS_code_2year_uncensoring']
+    event_2year = event_columns_code_2year[opt.outcome]
+    event_2year_uncensoring = event_columns_code_2year_uncensoring[opt.outcome]
+    
+    valdata = valdata.loc[valdata[event_2year_uncensoring] == 1] # oncly select uncensored patients at 2-year
+    valdata = valdata.reset_index(drop=True) 
+    
+    predicted_survival_function = np.asarray(cphAll_combine.predict_survival_function(valdata[para_tokeep_combine],times= [24.0]))[0]
+    real_survival = -np.asarray(valdata[event_2year]) + 1 
+    
+    print ('predicted_survival_function', predicted_survival_function)
+    print ('real_survival', real_survival)
+    
+    # HosmerLemeshow test
+    out_hosmer, prob_true , prob_pred = HosmerLemeshow(np.asarray(predicted_survival_function),np.asarray(real_survival), 3, strategy = "uniform") # "quantile" or "uniform"
+    print ('out_hosmer p-value:', out_hosmer["p - value"][0])
+    from sklearn.linear_model import LinearRegression
+    reg = LinearRegression().fit(np.array(prob_pred)[:, np.newaxis], prob_true)
+    slope, intercept = reg.coef_[0], reg.intercept_
+    print ('slope, intercept:' ,slope, intercept)
+    
+    plt.figure()      
+    plt.plot(prob_pred, prob_true,'o',markersize = 10, markerfacecolor = 'blue')
+    plt.plot((0, 1), slope*np.array([0,1]) + intercept , linestyle = '-',color ='blue', label = 'Real calibration') # predict line
+    
+    #plt.plot(prob_pred, prob_true)
+    plt.plot((0, 1), (0, 1), linestyle = '-',color ='red' , label = 'Ideal calibration') # ideal line
+    plt.ylabel("Observed actual 2-year " + event_name + ' rate', fontsize = 16, fontweight = 'bold')
+    plt.xlabel("Predicted 2-year " + event_name + ' rate', fontsize = 16, fontweight = 'bold')
+    plt.title("Independent internal test", fontsize = 16, fontweight = 'bold')
+    plt.legend(loc='upper left', prop={ 'size': 14})
+
+    plt.xticks(fontsize = 14)
+    plt.yticks(fontsize = 14)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.0])
+    
+    plt.text(0.55, 0.20, 'Slope = '+str('%.3f' % slope), fontsize=16 )
+    plt.text(0.55, 0.12, 'Intercept = '+str('%.3f' % intercept), fontsize=16 )
+    plt.text(0.55, 0.04, 'p = '+str('%.3f' % out_hosmer["p - value"][0]), fontsize=16 )
+    
+    figname = "./results/" + "Calibration_2year_"+ event  + '_opcradiomics.svg'
     plt.savefig(figname, bbox_inches = 'tight')
-   
     
-    
-    
-    #print('external test combined model c-index:', cphAll_combine.score(opcdata[171:282][para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    print('external test combined model c-index:', cphAll_combine.score(valdata[para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    
-    # external 1 high and los risk groups, KM-curves
 
-    #valdata = opcdata
-    trainD = traindata[para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]]
-    valdata = valdata.reset_index(drop=True) 
-    risk_scores_testing = cphAll_combine.predict_log_partial_hazard(valdata[para_tokeep_combine])
-    # calculate 95%Ci of C-index 
-    ci_cindex,cindex_values = conf_cindex(-risk_scores_testing , valdata[survival_columns[opt.outcome]], valdata[event_columns_code[opt.outcome]])
-    print ("combine model ci_cindex internal:",ci_cindex)
-    # save the 1000 cindex values
-    cindex_values = pd.DataFrame(cindex_values)
-    cindex_values.loc[0, '95%_CI'] = str(ci_cindex)
-    cindex_values.to_csv("/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/cindex/" + "cindexs_"+ event  + '_combine_external(umcgopc).csv')
-    #print (' risk of testing set:',risk_scores_testing)
-    
-    median_risk = np.median(cphAll_combine.predict_log_partial_hazard(trainD[para_tokeep_combine]))
-    highrisk_group_list = risk_scores_testing[np.where(risk_scores_testing>median_risk)[0]].index
-    lowrisk_group_list = risk_scores_testing[np.where(risk_scores_testing<=median_risk)[0]].index
-    #print ('high_risk_group:', highrisk_group_list , len(highrisk_group_list))
-    #print ('low_risk_group:', lowrisk_group_list , len(lowrisk_group_list))
-    
-    event = event_columns_code[opt.outcome]
-    time_e = survival_columns[opt.outcome]
-
-    # log rank test
-    from lifelines.statistics import logrank_test
-    results = logrank_test(valdata.loc[highrisk_group_list][time_e], valdata.loc[lowrisk_group_list][time_e]
-                           , event_observed_A=valdata.loc[highrisk_group_list][event], event_observed_B=valdata.loc[lowrisk_group_list][event])
-
-    results.print_summary()
-    print('p-value:', results.p_value)        # 0.7676
-    print(results.test_statistic) # 0.0872
-    '''
-    plt.figure()
-    ax = plt.subplot(111)
-    kmf_0 = KaplanMeierFitter()
-    ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    kmf_1 = KaplanMeierFitter()
-    ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    add_at_risk_counts(kmf_0, kmf_1, ax=ax)
-    plt.tight_layout()
-    plt.ylim([0.0,1.0])
-    ax.set_ylabel(real_event_names[opt.outcome])
-    ax.set_xlabel('Time (months)')
-    plt.title('External testing set')
-    if results.p_value < 0.001:
-       plt.text(70, 0.05, 'p = '+str(results.p_value), fontsize=8)
-       #plt.text(70, 0.05, 'p < 0.001', fontsize=8)
-    else:
-       plt.text(70, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=8)
-    '''
-    plt.figure()
-    ax = plt.subplot(111)
-    kmf_0 = KaplanMeierFitter()
-    ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    kmf_1 = KaplanMeierFitter()
-    ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    add_at_risk_counts(kmf_0, kmf_1, ax=ax, fontsize = 14)
-    plt.tight_layout()
-    plt.ylim([0.0,1.0])
-    ax.set_ylabel(str(real_event_names_short[opt.outcome]) + ' rate', fontsize = 16, fontweight = 'bold') # new
-    ax.set_xlabel('Time (months)',fontsize = 16, fontweight = 'bold')
-    ax.legend( loc='lower left', prop={ 'size': 14})
-    # new
-    #ax.set_xticks(labelsize = 14)
-    #ax.set_yticks(labelsize = 14)
-    ax.tick_params(axis='both',labelsize = 14)
-    plt.title("External test" , fontsize = 16, fontweight = 'bold') # new
-    if results.p_value < 0.001:
-       plt.text(55, 0.05, 'p = '+str(format(results.p_value,'.5e'))[:5] +str(format(results.p_value,'.5e'))[-4:], fontsize=14)
-    else:
-       plt.text(55, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=14 )
-    
-    figname = "/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/KM_high_low_risk/" + "KM5_combine_"+ event + '_umcgopc_(external).svg'
-    plt.savefig(figname, bbox_inches = 'tight')    
-    '''
-    # external test 2
-    trainD = traindata[para_tokeep+para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]]
-    opcD = opcdata[para_tokeep+para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]]
-    frames = [trainD,opcD] 
-    frames =pd.concat(frames).reset_index()
-    
-    frames_clc = frames[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]]
-
-    cphAll = CoxPHFitter()   ## Instantiate the class to create a cph object
-    cphAll.fit(frames_clc[200:366], survival_columns[opt.outcome], event_col=event_columns_code[opt.outcome],step_size=0.5)   ## Fit the data to train the model  
-    #print('external test clinical model c-index:', cphAll.score(frames_clc[366:477][para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    print('external test clinical model c-index:', cphAll.score(frames_clc[366:][para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    
-    frames['clinical_model_risk'] = cphAll.predict_log_partial_hazard(frames_clc[para_tokeep])
-    frames_combine = frames[para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]]
-    cphAll_combine = CoxPHFitter()   ## Instantiate the class to create a cph object
-    cphAll_combine.fit(frames_combine[200:366], survival_columns[opt.outcome], event_col=event_columns_code[opt.outcome],step_size=0.5)   ## Fit the data to train the model  
-    #print('external test combined model c-index:', cphAll_combine.score(frames_combine[366:477][para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    print('external test combined model c-index:', cphAll_combine.score(frames_combine[366:][para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-
-    # external 2 high and los risk groups, KM-curves
-    traindata = frames_combine[200:366]
-    valdata = frames_combine[366:]
-    valdata = valdata.reset_index(drop=True) 
-    print (' risk of training set:',cphAll_combine.predict_log_partial_hazard(traindata[para_tokeep_combine]))
-    risk_scores_testing = cphAll_combine.predict_log_partial_hazard(valdata[para_tokeep_combine])
-    print (' risk of testing set:',risk_scores_testing)
-    median_risk = np.median(cphAll_combine.predict_log_partial_hazard(traindata[para_tokeep_combine]))
-    print ('Median risk of training set:', median_risk) 
-    
-    highrisk_group_list = risk_scores_testing[np.where(risk_scores_testing>median_risk)[0]].index
-    lowrisk_group_list = risk_scores_testing[np.where(risk_scores_testing<=median_risk)[0]].index
-    print ('high_risk_group:', highrisk_group_list , len(highrisk_group_list))
-    print ('low_risk_group:', lowrisk_group_list , len(lowrisk_group_list))
-    
-    event = event_columns_code[opt.outcome]
-    time_e = survival_columns[opt.outcome]
-
-        # log rank test
-    from lifelines.statistics import logrank_test
-    results = logrank_test(valdata.loc[highrisk_group_list][time_e], valdata.loc[lowrisk_group_list][time_e]
-                           , event_observed_A=valdata.loc[highrisk_group_list][event], event_observed_B=valdata.loc[lowrisk_group_list][event])
-
-    results.print_summary()
-    print('p-value:', results.p_value)        # 0.7676
-    print(results.test_statistic) # 0.0872
-
-    plt.figure()
-    ax = plt.subplot(111)
-    kmf_0 = KaplanMeierFitter()
-    ax = kmf_0.fit(valdata.loc[highrisk_group_list][time_e], valdata.loc[highrisk_group_list][event],label='High risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    kmf_1 = KaplanMeierFitter()
-    ax = kmf_1.fit(valdata.loc[lowrisk_group_list][time_e], valdata.loc[lowrisk_group_list][event],label='Low risk').plot_survival_function(ax=ax,show_censors=True,ci_show=False)
-    add_at_risk_counts(kmf_0, kmf_1, ax=ax)
-    plt.tight_layout()
-    plt.ylim([0.0,1.0])
-    ax.set_ylabel(real_event_names[opt.outcome])
-    ax.set_xlabel('Time (months)')
-    if results.p_value < 0.001:
-       plt.text(70, 0.05, 'p < 0.001', fontsize=8)
-    else:
-       plt.text(70, 0.05, 'p = '+str(round(results.p_value, 3)), fontsize=8)      
-    
-    figname = "/data/pg-dl_radioth/scripts/Autoencoder_opcradiomics/KM_high_low_risk/" + "KM5_combine_"+ event + '_umcgopc_(external2).png'
-    plt.savefig(figname, bbox_inches = 'tight')    
-    '''
-
-    '''
-    # external test 2
-    frames = opcD
-    #cphAll = CoxPHFitter()   ## Instantiate the class to create a cph object
-    #cphAll.fit(frames[0:170], survival_columns[opt.outcome], event_col=event_columns_code[opt.outcome],step_size=0.5)   ## Fit the data to train the model  
-    #print('train c-index:', cphAll.score(frames[0:170][para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    #print('test c-index:', cphAll.score(frames[170:][para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    frames['clinical_model_risk'] = cphAll.predict_log_partial_hazard(frames[para_tokeep])
-    print('external test clinical model c-index:', cphAll.score(frames[para_tokeep+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    print('external test combined model c-index:', cphAll_combine.score(frames[para_tokeep_combine+[event_columns_code[opt.outcome]]+[survival_columns[opt.outcome]]],scoring_method='concordance_index'))
-    '''
 
 def conf_cindex(test_predictions, ground_truth_y,ground_truth_e, bootstrap=1000, seed=None,  confint=0.95):
     """Takes as input test predictions, ground truth, number of bootstraps, seed, and confidence interval"""
@@ -689,6 +438,55 @@ def Train_test_split(pt_list,ValidDataInd):
 
 	return trainval_list, test_list, all_list    
     
+from scipy.stats import chi2
+def HosmerLemeshow(obseved ,expected,bins = 5, strategy = "quantile") :
+    pihat=obseved
+    Y = expected
+    pihatcat=pd.cut(pihat, np.percentile(pihat,[0,20,40,60,80,100]),labels = False,include_lowest=True) #here we've chosen only 4 groups
+    
+    if strategy == "quantile":  # Determine bin edges by distribution of data
+        quantiles = np.linspace(0, 1, bins + 1)
+        pihatcat = np.percentile(obseved, quantiles * 100)
+    elif strategy == "uniform":
+        pihatcat = np.linspace(0.0, 1.0, bins + 1)
+    pihatcat = np.searchsorted(pihatcat[1:-1], obseved)
+
+    meanprobs =[0]*bins 
+    expevents =[0]*bins
+    obsevents =[0]*bins 
+    meanprobs2=[0]*bins 
+    expevents2=[0]*bins
+    obsevents2=[0]*bins 
+    #points
+    expprobs =[0]*bins
+    obsprobs =[0]*bins 
+    
+
+    for i in range(bins):
+       meanprobs[i]=np.mean(pihat[pihatcat==i])
+       expevents[i]=np.sum(pihatcat==i)*np.array(meanprobs[i])
+       obsevents[i]=np.sum(Y[pihatcat==i])
+       meanprobs2[i]=np.mean(1-pihat[pihatcat==i])
+       expevents2[i]=np.sum(pihatcat==i)*np.array(meanprobs2[i])
+       obsevents2[i]=np.sum(1-Y[pihatcat==i]) 
+       
+       expprobs[i] = np.sum(Y[pihatcat==i]) / len(Y[pihatcat==i])
+       obsprobs[i] = np.mean(pihat[pihatcat==i])
+
+    data1={'meanprobs':meanprobs,'meanprobs2':meanprobs2}
+    data2={'expevents':expevents,'expevents2':expevents2}
+    data3={'obsevents':obsevents,'obsevents2':obsevents2}
+    m=pd.DataFrame(data1)
+    e=pd.DataFrame(data2)
+    o=pd.DataFrame(data3)
+    
+    # The statistic for the test, which follows, under the null hypothesis,
+    # The chi-squared distribution with degrees of freedom equal to amount of groups - 2. Thus 4 - 2 = 2
+    tt=sum(sum((np.array(o)-np.array(e))**2/np.array(e))) 
+    pvalue=1-chi2.cdf(tt,int(bins) - 2)
+
+    return pd.DataFrame([[chi2.cdf(tt,2).round(2), pvalue.round(2)]],
+                        columns = ["Chi2", "p - value"]), expprobs, obsprobs #expevents,  obsevents
 
 if __name__ == '__main__':
 	main()

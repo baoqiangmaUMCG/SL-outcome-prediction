@@ -25,7 +25,7 @@ def parse_opts():
         help='Data directory path')
     parser.add_argument(
         '--data_path_linux',
-        default='/data/pg-dl_radioth/scripts/MultilabelLearning_OPC_Radiomics/OPC-Radiomics/VolPatch_clinical',
+        default='../Data_preprocessing/VolPatch_clinical',
         type=str,
         help='Data directory path')
         

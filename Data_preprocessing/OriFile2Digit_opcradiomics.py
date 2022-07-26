@@ -1,16 +1,19 @@
+'''
+The code of process clinical data and outcome 
+'''
+
 import pandas as pd
 import numpy as np
 from sklearn import preprocessing
 import matplotlib.pyplot as plt 
 plt.rc("font", size=14)
-import seaborn as sns
-sns.set(style="white")
-sns.set(style="whitegrid", color_codes=True)
+#import seaborn as sns
+#sns.set(style="white")
+#sns.set(style="whitegrid", color_codes=True)
 
 
-    
-#savename = r'F:\\HN\\OPC-Radiomics\\OPC_coxnet_featurefrequency.csv'
-opcradiomics = pd.ExcelFile('D:\\HN\\OPC-Radiomics\\Clinical data list_OPC (606) v3_newcolumnname.xlsx').parse(0)
+
+opcradiomics = pd.ExcelFile('./Clinical data list_OPC (606) v3_newcolumnname.xlsx').parse(0) # clinical data
 opcradiomics.dropna()
 
 #-----preparation of the opcradiomics data
@@ -19,27 +22,52 @@ opcradiomics['GESLACHT_codes']    = 1-opcradiomics['GESLACHT'].astype('category'
 
 opcradiomics['Smoking_codes']     = opcradiomics['Smoking'].astype('category').cat.codes.copy() # 0-Current, 1-Never, 2-Past
 
-opcradiomics['Smoking_codes'].loc[np.where(opcradiomics['Smoking']=='Ex-smoker')] = 2
+opcradiomics['Smoking_codes'].loc[np.where(opcradiomics['Smoking']=='Ex-smoker')] = 1 #change to 0-Current, 2-Never, 1-Past
 opcradiomics['Smoking_codes'].loc[np.where(opcradiomics['Smoking']=='Current')] = 0
-opcradiomics['Smoking_codes'].loc[np.where(opcradiomics['Smoking']=='Non-smoker')] = 1
+opcradiomics['Smoking_codes'].loc[np.where(opcradiomics['Smoking']=='Non-smoker')] = 2
+# new 
+opcradiomics['Smoking_codes_noVSyes'] = opcradiomics['Smoking_codes']
+opcradiomics['Smoking_codes_noVSyes'] = np.where(opcradiomics['Smoking_codes']==2,0,1) # 0-never smoke, 1-current or ever smoke
 
 opcradiomics['MODALITY_codes']    = 1-opcradiomics['MODALITY (chemo/not)'].astype('category').cat.codes # 0-RT only 1-chemo 
 
-opcradiomics['TSTAD_DEF_codes']   = opcradiomics['TSTAD_DEF'].astype('category').cat.codes # 0-T1,1-T2,2-T3,3-T4a,4-T4b
-opcradiomics['TSTAD_DEF_codes'].loc[np.where(opcradiomics['TSTAD_DEF']=='T4b')] = 3  # 0-T1,1-T2,2-T3,3-T4
-
-opcradiomics['NSTAD_DEF_codes']   = opcradiomics['NSTAD_DEF'].astype('category').cat.codes # 0-N0,1-N1,2-N2a,3-N2b,4-N2c,5-N3
+opcradiomics['TSTAD_codes']   = opcradiomics['TSTAD_DEF'].astype('category').cat.codes # 0-T1,1-T2,2-T3,3-T4a,4-T4b
+opcradiomics['TSTAD_codes'].loc[np.where(opcradiomics['TSTAD_DEF']=='T4b')] = 3  # 0-T1,1-T2,2-T3,3-T4
 
 
-opcradiomics['P16_codes']         = opcradiomics['P16'].astype('category').cat.codes # 0-negative,1-positive,2-unknown
+# new
+opcradiomics['TSTAD_codes_12VS34'] = opcradiomics['TSTAD_codes']
+opcradiomics['TSTAD_codes_12VS34'].loc[np.where(opcradiomics['TSTAD_codes']<2)] = 0  # 0-T1T2
+opcradiomics['TSTAD_codes_12VS34'].loc[np.where(opcradiomics['TSTAD_codes']>1)] = 1  # 0-T3T4
 
-print (opcradiomics['P16'])
-print (opcradiomics['P16_codes'])
+opcradiomics['NSTAD_codes']   = opcradiomics['NSTAD_DEF'].astype('category').cat.codes # 0-N0,1-N1,2-N2a,3-N2b,4-N2c,5-N3
 
+# new
+opcradiomics['NSTAD_codes_012VS3'] = opcradiomics['NSTAD_codes']
+opcradiomics['NSTAD_codes_012VS3'].loc[np.where(opcradiomics['NSTAD_codes']<5)] = 0  # 0-N0N1N2
+opcradiomics['NSTAD_codes_012VS3'].loc[np.where(opcradiomics['NSTAD_codes']==5)] = 1  # 0-N3
+
+# new
+opcradiomics['P16_codes']  = opcradiomics['P16'].astype('category').cat.codes # 0-negative,1-positive,2-unknown
+opcradiomics['P16_codes_combine'] = np.where(opcradiomics['P16_codes']==0,0,1) # 0-negative , 1-positive and unknown
 
 opcradiomics['WHO_SCORE_codes']   = opcradiomics['WHO_SCORE'].astype('category').cat.codes # 0- ecog 0, 1-ecog 1, 2-ecog 2, 3-ecog 3, 4-ecog4,-1-non
 opcradiomics['WHO_SCORE_codes'].loc[np.where(opcradiomics['WHO_SCORE_codes']==-1)] = 5
 
+# old
+opcradiomics['TSTAD_codes_123VS4'] = np.where(opcradiomics['TSTAD_codes']==3,1,0)
+opcradiomics['NSTAD_codes_N01VSN2VSN3'] = opcradiomics['NSTAD_codes']
+opcradiomics['NSTAD_codes_N01VSN2VSN3'].loc[np.where(opcradiomics['NSTAD_codes_N01VSN2VSN3']==1)] = 0
+opcradiomics['NSTAD_codes_N01VSN2VSN3'].loc[np.where(opcradiomics['NSTAD_codes_N01VSN2VSN3']==2)] = 1
+opcradiomics['NSTAD_codes_N01VSN2VSN3'].loc[np.where(opcradiomics['NSTAD_codes_N01VSN2VSN3']==3)] = 1
+opcradiomics['NSTAD_codes_N01VSN2VSN3'].loc[np.where(opcradiomics['NSTAD_codes_N01VSN2VSN3']==4)] = 1
+opcradiomics['NSTAD_codes_N01VSN2VSN3'].loc[np.where(opcradiomics['NSTAD_codes_N01VSN2VSN3']==5)] = 2
+
+opcradiomics['WHO_SCORE_codes_0VS123'] = np.where(opcradiomics['WHO_SCORE_codes']==0,0,1)
+'''
+numeric_columns = ['AGE']
+opcdata[numeric_columns] = opcdata[numeric_columns]/100.
+'''  
 #-----endpoints
 
 opcradiomics['Status(OS)'].value_counts()
@@ -54,14 +82,6 @@ opcradiomics['OS_2year_uncensoring'] = 1
 opcradiomics['OS_2year_uncensoring'].loc[list(opcradiomics.loc[(opcradiomics['OS_code']==0) & (opcradiomics['TIME_OS']<24)].index)]=0 #
 
 
-'''
-opcradiomics['TIME_OS'].hist()
-plt.title('Histogram of TIME_OS')
-plt.xlabel('TIME_OS')
-plt.ylabel('Frequency')
-plt.show()
-'''
-
 opcradiomics['TumorSpecificSurvival'] = opcradiomics['Cause of Death'] # make a copy
 opcradiomics['TumorSpecificSurvival_code'] = np.where(opcradiomics['TumorSpecificSurvival']=='Index Cancer',1,0)
 opcradiomics['TIME_TumorSpecificSurvival'] = opcradiomics['TIME_OS'] # tumor specific survival
@@ -70,8 +90,6 @@ opcradiomics['TumorSpecificSurvival_2year'] = opcradiomics['TumorSpecificSurviva
 opcradiomics['TumorSpecificSurvival_2year'].loc[list(opcradiomics.loc[(opcradiomics['TumorSpecificSurvival_code']==1) & (opcradiomics['TIME_TumorSpecificSurvival']>24)].index)]=0 # -35
 opcradiomics['TumorSpecificSurvival_2year_uncensoring'] = 1
 opcradiomics['TumorSpecificSurvival_2year_uncensoring'].loc[list(opcradiomics.loc[(opcradiomics['TumorSpecificSurvival_code']==0) & (opcradiomics['TIME_TumorSpecificSurvival']<24)].index)]=0 #
-
-
 
 opcradiomics['LR_code']=np.where(opcradiomics['Local Failure']=='Yes',1,0) # 0-no LR, 1- yes LR
 opcradiomics['TIME_LR'] = (opcradiomics['TIME_diagnosis2LF (days)']-opcradiomics['Time interval from the date of diagnosis to the RT start date (days)'])/30.0
@@ -124,9 +142,9 @@ opcradiomics['DFS_code_2year_uncensoring'].loc[list(opcradiomics.loc[(opcradiomi
 
 
 
-clinical_para_ori = ['AGE','GESLACHT','Smoking','MODALITY','TSTAD_DEF', 'NSTAD_DEF', 'P16', 'WHO_SCORE']
-clinical_para = ['AGE','GESLACHT_codes','Smoking_codes','MODALITY_codes','TSTAD_DEF_codes', 'NSTAD_DEF_codes', 'P16_codes', 'WHO_SCORE_codes']
-clinical_para_binary = ['Smoke_noVSyes','MODALITY_rtVSrtsys','TSTAD_DEF_T123VS4','NSTAD_DEF_N01VS23','WHO_SCORE_0VS123']
+
+clinical_para = ['AGE','GESLACHT_codes','Smoking_codes','Smoking_codes_noVSyes','MODALITY_codes','TSTAD_codes','TSTAD_codes_123VS4','TSTAD_codes_12VS34', 'NSTAD_codes','NSTAD_codes_N01VSN2VSN3','NSTAD_codes_012VS3', 
+                 'P16_codes', 'P16_codes_combine', 'WHO_SCORE_codes','WHO_SCORE_codes_0VS123']
 
 # endpoint (original and correct for two year prediction) and survival
 
@@ -158,10 +176,10 @@ for i in range(6):
     # time point split-> levels = ['0-Current 177', '1-Never 123', '2-Past 39']
     # variable = 'MODALITY_codes' 
     # levels = ['0- RT 309', '1-Concurrent chemoradiation 297']
-    # variable = 'TSTAD_DEF_codes' 
+    # variable = 'TSTAD_codes' 
     # levels = ['0-T1 103','1-T2 198','2-T3 183','3-T4 122']
     # time poiint split -> levels = ['0-T1 54','1-T2 92','2-T3 53','3-T4 141']
-    # variable = 'NSTAD_DEF_codes' 
+    # variable = 'NSTAD_codes' 
     # levels = ['0-N0 101','1-N1 61','2-N2a 41','3-N2b 200','4-N2c 156','5-N3 47']
     # variable = 'P16_codes'
     # levels = ['0-unknown 24','1-negative 127','2-positive 98']
@@ -218,4 +236,4 @@ all_colums_tosave.extend(uncensoring_for2year_columns)
 
 OPCdigits = opcradiomics[all_colums_tosave]
 
-OPCdigits.to_csv (r'D:\\HN\\OPC-Radiomics\\opcradiomics_digits_202103_TRY.csv', index = True, header=True)
+OPCdigits.to_csv ('./opcradiomics_digits_202103.csv', index = True, header=True)

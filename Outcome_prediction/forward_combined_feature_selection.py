@@ -26,7 +26,7 @@ def main():
     opt = parse_opts()
     losses_str = '_'.join(opt.losses)
     
-    ValidDataInd = pickle.load(open('/data/pg-dl_radioth/scripts/MultilabelLearning_OPC_Radiomics/OPC-Radiomics/ValidDataInd_clinical.d', 'rb'))
+    ValidDataInd = pickle.load(open('../Data_preprocessing/VolPatch_clinical/ValidDataInd_clinical.d', 'rb'))
     
     opt.HNSCC_ptnum = 606
     ptlist = range(opt.HNSCC_ptnum)
@@ -40,19 +40,13 @@ def main():
                           + '_z_size' + str(opt.z_size) + '_md' + str(opt.model_depth) + '_sepconv_' + losses_str + '_' + opt.lr_scheduler
     
     ct_feature_list =  [str(i)+'_ct_gtv' for i in range(0,1024)]
-    
-    # potential clinical predictors
-    '''
-    latent_feature_list = ['AGE','GESLACHT_codes','Smoking_codes','MODALITY_codes','TSTAD_DEF_codes_T123VS4','NSTAD_DEF_codes_N01VSN2VSN3', 
-                     'P16_codes', 'WHO_SCORE_codes','WHO_SCORE_codes_0VS123']
-    '''
     event_columns_code = ['OS_code','TumorSpecificSurvival_code','MET_code','LR_code','RR_code','LRR_code','DFS_code'] # DFS here is not correct
     survival_columns = ['TIME_OS','TIME_TumorSpecificSurvival','TIME_MET','TIME_LR','TIME_RR','TIME_LRR','TIME_DFS']
     
     # potential image feature predictors and the output of clinical model (need to build clinical model first)
     latent_feature_list = ['clinical_model_risk_'+event_columns_code[opt.outcome]] + ct_feature_list
-    opcdata = pd.read_csv(opt.result_path_ct+'/latent_feature_total.csv')
-    #opcdata = pd.read_csv(opt.result_path_ct+'/latent_feature_total'+event_columns_code[opt.outcome]+'.csv')
+    #opcdata = pd.read_csv(opt.result_path_ct+'/latent_feature_total.csv')
+    opcdata = pd.read_csv(opt.result_path_ct+'/latent_feature_total'+event_columns_code[opt.outcome]+'.csv')
     print (opcdata)
     traindata = opcdata.loc[train_list].reset_index(drop=True) 
 

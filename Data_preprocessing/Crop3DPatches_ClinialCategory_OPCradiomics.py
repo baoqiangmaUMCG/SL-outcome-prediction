@@ -30,7 +30,7 @@ def main():
     # organization of the clinical parameters and endpoints
     ValidDataInd = np.zeros(606)
 
-    OPCradiomicsdata = pd.read_csv('F:\\HN\\OPC-Radiomics\\opcradiomics_digits_202103.csv',header=0)
+    OPCradiomicsdata = pd.read_csv('./opcradiomics_digits_202103.csv',header=0)
 
     # grouping different levels of the categorical variables
     OPCradiomicsdata['TSTAD_DEF_codes_T123VS4'] = np.where(OPCradiomicsdata['TSTAD_DEF_codes']==3,1,0)
@@ -99,7 +99,7 @@ def main():
     NSTAD_DEF_codes_N01VSN2VSN3 = OPCradiomicsdata[clinical_para_strat[5]]
     P16_codes                   = OPCradiomicsdata[clinical_para_strat[6]]
 
-    AllPaRTFile = pickle.load(open('F:\\HN\\OPC-Radiomics\\AllScanROIFile_OPCRadiomics.d','rb'))
+    AllPaRTFile = pickle.load(open('./AllScanROIFile_OPCRadiomics.d','rb'))
 
     # the following parameters are determined by the umcg dataset
     crop_sz = 90
@@ -113,14 +113,14 @@ def main():
     EndPoints = (OS,TIME_OS,TSS,TIME_TSS,MET,TIME_MET,LR,TIME_LR,RR,TIME_RR,LRR,TIME_LRR,DFS,TIME_DFS,
                     OS_2year,OS_2year_uncen,TSS_2year,TSS_2year_uncen,MET_2year,MET_2year_uncen,LR_2year,
                     LR_2year_uncen,RR_2year,RR_2year_uncen,LRR_2year,LRR_2year_uncen,DFS_2year,DFS_2year_uncen)
-    pickle.dump(np.asarray(EndPoints), open('F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\EndPoints_clinical.d','wb'))    
+    pickle.dump(np.asarray(EndPoints), open('./EndPoints_clinical.d','wb'))    
 
     for i in range(0,606):
 
         #if i in ExcPT: 
             #continue
 
-        filename_data = 'F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\VolPatch_'+ str(i) +'_data.d'
+        filename_data = './VolPatch_clinical/VolPatch_'+ str(i) +'_data.d'
 
         # to extract imaging info
         input_info = AllPaRTFile[i] 
@@ -183,8 +183,8 @@ def main():
             VolData.to_csv('F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\VolPatch_'+ str(i) +'_data.csv')
             VolInfo.to_csv('F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\VolPatch_'+ str(i) +'_Info.csv')
             '''
-            filename_data = 'F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\VolPatch_'+ str(i) +'_data.d'
-            filename_info = 'F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\VolPatch_'+ str(i) +'_info.d'	
+            filename_data = './VolPatch_clinical/VolPatch_'+ str(i) +'_data.d'
+            filename_info = './VolPatch_clinical/VolPatch_'+ str(i) +'_info.d'	
 
             pickle.dump(VolData,open(filename_data,'wb'))
             pickle.dump(VolInfo,open(filename_info,'wb'))	
@@ -193,9 +193,7 @@ def main():
         except:
             continue
             
-    pickle.dump(ValidDataInd, open('F:\\HN\\OPC-Radiomics\\VolPatch_clinical\\ValidDataInd_clinical.d','wb'))
-
-
+    pickle.dump(ValidDataInd, open('./VolPatch_clinical/ValidDataInd_clinical.d','wb'))
 
 def CategoricalPara(Para,nob=None):
     # this function convert number to one-hot coding

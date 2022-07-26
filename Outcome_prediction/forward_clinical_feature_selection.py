@@ -42,9 +42,7 @@ def main():
     ct_feature_list =  [str(i)+'_ct_gtv' for i in range(0,1024)]
     
     # potential clinical predictors
-    
-    latent_feature_list = ['AGE','GESLACHT_codes','Smoking_codes','MODALITY_codes','TSTAD_DEF_codes_T123VS4','NSTAD_DEF_codes_N01VSN2VSN3', 
-                     'P16_codes', 'WHO_SCORE_codes','WHO_SCORE_codes_0VS123']
+    latent_feature_list = ['AGE','GESLACHT_codes','Smoking_codes','MODALITY_codes','TSTAD_codes_123VS4','NSTAD_codes_N01VSN2VSN3','P16_codes','WHO_SCORE_codes_0VS123']
    
     event_columns_code = ['OS_code','TumorSpecificSurvival_code','MET_code','LR_code','RR_code','LRR_code','DFS_code'] # DFS here is not correct
     survival_columns = ['TIME_OS','TIME_TumorSpecificSurvival','TIME_MET','TIME_LR','TIME_RR','TIME_LRR','TIME_DFS']
